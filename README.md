@@ -40,6 +40,8 @@ disable the dhcp client on the wlan interface used by the hotspot
 ```sh
 sudo nano /etc/dhcpcd.conf
 # add the following lines in the file
+denyinterfaces wlan0 # interface used by the hotspot
+
 interface wlan0 # interface used by the hotspot
   nohook wpa_supplicant
 ```
@@ -69,6 +71,8 @@ sudo docker run -d \
 
 ### without DHCP
 
+#### Debian 12 and below
+
 install the bridge-utils package and configure the network interfaces
 ```sh
 sudo apt-get install bridge-utils
@@ -85,10 +89,29 @@ iface br0 inet dhcp
     bridge_ports eth0
 ```
 
+#### Debian 13 and above
+
+get the MAC address of the eth0 interface
+```sh
+cat /sys/class/net/eth0/address
+```
+
+copy the systemd-networkd configuration files and set the MAC address of eth0 in br0.netdev
+```sh
+sudo cp /opt/light-wifi-ap/withoutDHCP/systemd/network/* /etc/systemd/network/
+sudo sed -i 's/xx:xx:xx:xx:xx:xx/<eth0-mac-address>/' /etc/systemd/network/br0.netdev
+sudo systemctl enable systemd-networkd
+sudo systemctl restart systemd-networkd
+```
+
+#### Common steps for both Debian 12 and below and Debian 13 and above
+
 disable the dhcp client on the wlan interface used by the hotspot
 ```sh
 sudo nano /etc/dhcpcd.conf
 # add the following lines in the file
+denyinterfaces wlan0 # interface used by the hotspot
+
 interface wlan0 # interface used by the hotspot
   nohook wpa_supplicant
 ```
