@@ -106,6 +106,24 @@ sudo systemctl restart systemd-networkd
 
 #### Common steps for both Debian 12 and below and Debian 13 and above
 
+in iptables add the following lines to allow the traffic between the wifi network and the ethernet network
+```sh
+# step 1
+# add rule to iptables and make a backup file
+sudo iptables -I DOCKER-USER -i br0 -j ACCEPT
+sudo iptables-save > /etc/iptables/rules
+# step 2
+# add the iptables-restore command to the rc.local file
+sudo nano /etc/rc.local
+iptables-restore < /etc/iptables/rules
+```
+if you cannot use this method you can use the crontab for the same result
+```sh
+sudo crontab -e
+# add the following lines in the file
+@reboot sleep 60 && sudo iptables -I DOCKER-USER -i br0 -j ACCEPT
+```
+
 disable the dhcp client on the wlan interface used by the hotspot
 ```sh
 sudo nano /etc/dhcpcd.conf
