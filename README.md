@@ -123,6 +123,16 @@ iface br0 inet dhcp
     bridge_ports eth0
 ```
 
+disable the dhcp client on the wlan interface used by the hotspot
+```sh
+sudo nano /etc/dhcpcd.conf
+# add the following lines in the file
+denyinterfaces wlan0 # interface used by the hotspot
+
+interface wlan0 # interface used by the hotspot
+  nohook wpa_supplicant
+```
+
 #### Debian 13 and above
 
 get the MAC address of the eth0 interface
@@ -136,6 +146,16 @@ sudo cp /opt/light-wifi-ap/withoutDHCP/systemd/network/* /etc/systemd/network/
 sudo sed -i 's/xx:xx:xx:xx:xx:xx/<eth0-mac-address>/' /etc/systemd/network/br0.netdev
 sudo systemctl enable systemd-networkd
 sudo systemctl restart systemd-networkd
+```
+
+disable the DHCP client on the wlan interface used by the hotspot
+
+tell NetworkManager to ignore the wlan interface used by the hotspot
+```sh
+sudo tee /etc/NetworkManager/conf.d/99-unmanaged-wlan0.conf <<'EOF'
+[keyfile]
+unmanaged-devices=interface-name:wlan0
+EOF
 ```
 
 #### Common steps for both Debian 12 and below and Debian 13 and above
@@ -156,16 +176,6 @@ if you cannot use this method you can use the crontab for the same result
 sudo crontab -e
 # add the following lines in the file
 @reboot sleep 60 && sudo iptables -I DOCKER-USER -i br0 -j ACCEPT
-```
-
-disable the dhcp client on the wlan interface used by the hotspot
-```sh
-sudo nano /etc/dhcpcd.conf
-# add the following lines in the file
-denyinterfaces wlan0 # interface used by the hotspot
-
-interface wlan0 # interface used by the hotspot
-  nohook wpa_supplicant
 ```
 
 reboot the system before running the container
