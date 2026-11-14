@@ -14,10 +14,40 @@ cd light-wifi-ap
 ```
 then you can choose between the 2 versions of the container.
 
+### Fixed name for the hotspot interface (all versions)
+
+the kernel names the wifi interfaces `wlan0`, `wlan1`... in the order they are detected, so with a USB dongle the numbers can change from one boot to another.
+to avoid this, the hotspot interface is renamed to a fixed name: `wlan_light_wifi`. This name is used in all the config files of this repository (`hostapd.conf`, `dnsmasq.conf`, ...).
+
+get the MAC address of the wifi dongle/interface used by the hotspot (replace `wlan0` by the current name of the interface)
+```sh
+cat /sys/class/net/wlan0/address
+```
+
+create the `.link` file and set the MAC address of the dongle in it (`<wlan-mac-address>` is the address found above, NOT the one of `eth0`)
+```sh
+sudo cp /opt/light-wifi-ap/withDHCP/systemd/network/10-light-wifi-interface.link /etc/systemd/network/
+# or withoutDHCP/systemd/network/ if you use the version without DHCP, the file is the same
+sudo sed -i 's/AA:BB:CC:DD:EE:FF/<wlan-mac-address>/' /etc/systemd/network/10-light-wifi-interface.link
+```
+
+the file `/etc/systemd/network/10-light-wifi-interface.link` must look like this (with the MAC of your dongle)
+
+```ini
+[Match]
+MACAddress=AA:BB:CC:DD:EE:FF
+
+[Link]
+Name=wlan_light_wifi
+```
+this file is handled by udev, so it works on Debian 12 and below and on Debian 13 and above. The interface is renamed at the next reboot (the reboot at the end of each section), after that `ip link show wlan_light_wifi` must show the interface.
+
+in the rest of this document `wlan_light_wifi` is the interface used by the hotspot.
+
 ### with DHCP
 
-in this section `wlan0` is the interface used by the hotspot (`192.168.5.1/24`) and `eth0` is the interface that provides internet access.
-if your interfaces have other names (for example a USB wifi dongle named `wlan1`, or an uplink on `wlan0`), adapt the commands and the files in the config folder.
+in this section `wlan_light_wifi` is the interface used by the hotspot (`192.168.5.1/24`) and `eth0` is the interface that provides internet access.
+if your uplink interface has another name, adapt the commands and the files in the config folder.
 the subnet `192.168.5.0/24` must not be used by the upstream network.
 
 #### Debian 12 and below
@@ -26,28 +56,28 @@ set a static ip on the wlan interface used by the hotspot and disable `wpa_suppl
 ```sh
 sudo nano /etc/dhcpcd.conf
 # add the following lines in the file
-interface wlan0 # interface used by the hotspot
+interface wlan_light_wifi # interface used by the hotspot
   static ip_address=192.168.5.1/24
   nohook wpa_supplicant
 ```
 
 #### Debian 13 and above
 
-Debian 13 uses NetworkManager instead of dhcpcd, so `/etc/dhcpcd.conf` is ignored: without the following steps `wlan0` has no ip address, dnsmasq cannot answer the DHCP requests and the clients disconnect after a few seconds.
+Debian 13 uses NetworkManager instead of dhcpcd, so `/etc/dhcpcd.conf` is ignored: without the following steps `wlan_light_wifi` has no ip address, dnsmasq cannot answer the DHCP requests and the clients disconnect after a few seconds.
 
 tell NetworkManager to ignore the wlan interface used by the hotspot
 ```sh
-sudo tee /etc/NetworkManager/conf.d/99-unmanaged-wlan0.conf <<'EOF'
+sudo tee /etc/NetworkManager/conf.d/99-unmanaged-wlan_light_wifi.conf <<'EOF'
 [keyfile]
-unmanaged-devices=interface-name:wlan0
+unmanaged-devices=interface-name:wlan_light_wifi
 EOF
 ```
 
 set the static ip with systemd-networkd
 ```sh
-sudo tee /etc/systemd/network/20-wlan0.network <<'EOF'
+sudo tee /etc/systemd/network/20-wlan_light_wifi.network <<'EOF'
 [Match]
-Name=wlan0
+Name=wlan_light_wifi
 
 [Network]
 Address=192.168.5.1/24
@@ -60,8 +90,8 @@ sudo systemctl restart NetworkManager
 
 check that the interface has its ip and is not managed by NetworkManager
 ```sh
-ip -4 addr show wlan0 # must show 192.168.5.1/24
-nmcli dev status      # wlan0 must be "unmanaged"
+ip -4 addr show wlan_light_wifi # must show 192.168.5.1/24
+nmcli dev status                # wlan_light_wifi must be "unmanaged"
 ```
 
 #### Common steps for both Debian 12 and below and Debian 13 and above
@@ -127,9 +157,9 @@ disable the dhcp client on the wlan interface used by the hotspot
 ```sh
 sudo nano /etc/dhcpcd.conf
 # add the following lines in the file
-denyinterfaces wlan0 # interface used by the hotspot
+denyinterfaces wlan_light_wifi # interface used by the hotspot
 
-interface wlan0 # interface used by the hotspot
+interface wlan_light_wifi # interface used by the hotspot
   nohook wpa_supplicant
 ```
 
@@ -141,8 +171,9 @@ cat /sys/class/net/eth0/address
 ```
 
 copy the systemd-networkd configuration files and set the MAC address of eth0 in br0.netdev
+(if you already copied `10-light-wifi-interface.link` and set the MAC of the dongle in it, see "Fixed name for the hotspot interface", do not overwrite it: copy only the `br0.*` and `eth0.network` files)
 ```sh
-sudo cp /opt/light-wifi-ap/withoutDHCP/systemd/network/* /etc/systemd/network/
+sudo cp /opt/light-wifi-ap/withoutDHCP/systemd/network/br0.* /opt/light-wifi-ap/withoutDHCP/systemd/network/eth0.network /etc/systemd/network/
 sudo sed -i 's/xx:xx:xx:xx:xx:xx/<eth0-mac-address>/' /etc/systemd/network/br0.netdev
 sudo systemctl enable systemd-networkd
 sudo systemctl restart systemd-networkd
@@ -152,9 +183,9 @@ disable the DHCP client on the wlan interface used by the hotspot
 
 tell NetworkManager to ignore the wlan interface used by the hotspot
 ```sh
-sudo tee /etc/NetworkManager/conf.d/99-unmanaged-wlan0.conf <<'EOF'
+sudo tee /etc/NetworkManager/conf.d/99-unmanaged-wlan_light_wifi.conf <<'EOF'
 [keyfile]
-unmanaged-devices=interface-name:wlan0
+unmanaged-devices=interface-name:wlan_light_wifi
 EOF
 ```
 

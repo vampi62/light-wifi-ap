@@ -1,0 +1,5 @@
+[Match]
+MACAddress=AA:BB:CC:DD:EE:FF
+
+[Link]
+Name=wlan_light_wifi
